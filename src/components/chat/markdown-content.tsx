@@ -26,12 +26,21 @@ function extractText(node: ReactNode): string {
   return "";
 }
 
+function getLanguageFromChildren(children: ReactNode): string | undefined {
+  if (children && typeof children === "object" && "props" in children) {
+    const element = children as ReactElement<{ className?: string }>;
+    const match = /language-(\w+)/.exec(element.props.className ?? "");
+    return match?.[1];
+  }
+  return undefined;
+}
+
 function CodeBlock({ children, className, ...props }: HTMLAttributes<HTMLPreElement>) {
   const [copied, setCopied] = useState(false);
   const preRef = useRef<HTMLPreElement>(null);
 
-  const match = /language-(\w+)/.exec(className ?? "");
-  const language = match?.[1];
+  const preMatch = /language-(\w+)/.exec(className ?? "");
+  const language = preMatch?.[1] ?? getLanguageFromChildren(children);
 
   const handleCopy = useCallback(async () => {
     try {
@@ -85,7 +94,7 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
     <div className={cn("prose prose-sm dark:prose-invert max-w-none", className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
+        rehypePlugins={[[rehypeHighlight, { ignoreMissing: true }]]}
         components={{ pre: CodeBlock }}
       >
         {content}

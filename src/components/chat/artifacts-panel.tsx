@@ -11,6 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Artifact } from "@/hooks/use-artifacts";
 import { cn } from "@/lib/utils";
 
+import { MermaidBlock } from "./mermaid-block";
+
 interface ArtifactsPanelProps {
   artifacts: Artifact[];
   activeArtifactId: string | null;
@@ -24,8 +26,12 @@ function ArtifactViewer({ artifact }: { artifact: Artifact }) {
 
   const highlightedCode = useMemo(() => {
     if (artifact.type === "code" && artifact.language) {
+      const lang = artifact.language;
+      if (lang === "mermaid" || !hljs.getLanguage(lang)) {
+        return hljs.highlightAuto(artifact.content).value;
+      }
       try {
-        return hljs.highlight(artifact.content, { language: artifact.language }).value;
+        return hljs.highlight(artifact.content, { language: lang }).value;
       } catch {
         return hljs.highlightAuto(artifact.content).value;
       }
@@ -84,13 +90,19 @@ function ArtifactViewer({ artifact }: { artifact: Artifact }) {
         </div>
       </div>
       <ScrollArea className="flex-1">
-        <pre className="p-4">
-          <code
-            className={cn("text-sm", artifact.language && `language-${artifact.language}`)}
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: highlight.js requires innerHTML for syntax highlighting
-            dangerouslySetInnerHTML={{ __html: highlightedCode }}
-          />
-        </pre>
+        {artifact.language === "mermaid" ? (
+          <div className="p-4">
+            <MermaidBlock chart={artifact.content} />
+          </div>
+        ) : (
+          <pre className="p-4">
+            <code
+              className={cn("text-sm", artifact.language && `language-${artifact.language}`)}
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: highlight.js requires innerHTML for syntax highlighting
+              dangerouslySetInnerHTML={{ __html: highlightedCode }}
+            />
+          </pre>
+        )}
       </ScrollArea>
     </div>
   );

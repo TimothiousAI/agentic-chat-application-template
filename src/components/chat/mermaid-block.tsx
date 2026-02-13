@@ -2,7 +2,7 @@
 
 import mermaid from "mermaid";
 import { useTheme } from "next-themes";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 interface MermaidBlockProps {
   chart: string;
@@ -12,7 +12,7 @@ let mermaidInitialized = false;
 
 export function MermaidBlock({ chart }: MermaidBlockProps) {
   const { theme } = useTheme();
-  const containerRef = useRef<HTMLDivElement>(null);
+  const uniqueId = useId();
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,28 +29,34 @@ export function MermaidBlock({ chart }: MermaidBlockProps) {
   }, [theme]);
 
   useEffect(() => {
-    const renderDiagram = async () => {
-      if (!containerRef.current) {
-        return;
-      }
+    let cancelled = false;
 
+    const renderDiagram = async () => {
       try {
         mermaid.initialize({
           theme: theme === "dark" ? "dark" : "default",
         });
 
-        const id = `mermaid-${Math.random().toString(36).substring(2, 11)}`;
+        const id = `mermaid-${uniqueId.replace(/:/g, "")}`;
         const { svg: renderedSvg } = await mermaid.render(id, chart);
-        setSvg(renderedSvg);
-        setError(null);
+        if (!cancelled) {
+          setSvg(renderedSvg);
+          setError(null);
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to render diagram");
-        setSvg(null);
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to render diagram");
+          setSvg(null);
+        }
       }
     };
 
     void renderDiagram();
-  }, [chart, theme]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [chart, theme, uniqueId]);
 
   if (error) {
     return (
@@ -71,7 +77,6 @@ export function MermaidBlock({ chart }: MermaidBlockProps) {
 
   return (
     <div
-      ref={containerRef}
       className="mermaid-container overflow-x-auto rounded-lg border border-border bg-background p-4"
       // biome-ignore lint/security/noDangerouslySetInnerHtml: mermaid requires innerHTML for SVG rendering
       dangerouslySetInnerHTML={{ __html: svg }}
