@@ -442,3 +442,59 @@
     opacity: 1;
   }
 }
+
+/* CopilotKit custom styling to match shadcn/ui theme */
+:root {
+  --copilotkit-primary-color: var(--primary);
+  --copilotkit-secondary-color: var(--secondary);
+  --copilotkit-background-color: var(--background);
+  --copilotkit-card-color: var(--card);
+  --copilotkit-text-color: var(--foreground);
+  --copilotkit-muted-color: var(--muted);
+  --copilotkit-border-color: var(--border);
+  --copilotkit-radius: var(--radius);
+}
+
+/* Override CopilotKit popup positioning (bottom-right) */
+.copilotkit-popup-container {
+  bottom: 1.5rem;
+  right: 1.5rem;
+}
+
+/* Style popup to match chat UI */
+.copilotkit-popup {
+  border: 1px solid var(--border);
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+.dark .copilotkit-popup {
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+/* Match button styling to shadcn/ui */
+.copilotkit-button-primary {
+  background-color: oklch(0.6 0.18 250);
+  color: white;
+  border-radius: var(--radius);
+}
+
+.copilotkit-button-primary:hover {
+  background-color: oklch(0.55 0.17 250);
+}
+
+/* Message bubbles */
+.copilotkit-message-user {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  border-radius: var(--radius);
+}
+
+.copilotkit-message-assistant {
+  background-color: var(--muted);
+  color: var(--foreground);
+  border-radius: var(--radius);
+}

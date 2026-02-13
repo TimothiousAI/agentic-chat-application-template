@@ -7,6 +7,9 @@ import { useArtifacts } from "@/hooks/use-artifacts";
 import { useChat } from "@/hooks/use-chat";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 
+import { CopilotActions } from "../copilot/copilot-actions";
+import { CopilotPanel } from "../copilot/copilot-panel";
+import { CopilotState } from "../copilot/copilot-state";
 import { ArtifactsPanel } from "./artifacts-panel";
 import { ChatHeader } from "./chat-header";
 import type { ChatInputRef } from "./chat-input";
@@ -83,10 +86,32 @@ export function ChatLayout() {
     isStreaming,
   });
 
+  const chatState = {
+    conversations,
+    activeConversationId,
+    messageCount: messages.length,
+    isStreaming,
+    streamingContent,
+  };
+
+  const chatActions = {
+    createNewChat: handleCreateNewChat,
+    selectConversation,
+    renameConversation,
+    deleteConversation,
+  };
+
   const hasMessages = messages.length > 0 || isStreaming;
 
   return (
-    <>
+    <CopilotState chatState={chatState}>
+      <CopilotActions
+        conversations={conversations}
+        activeConversationId={activeConversationId}
+        chatActions={chatActions}
+      />
+      <CopilotPanel />
+
       <div className="flex h-screen">
         <ChatSidebar
           conversations={conversations}
@@ -160,6 +185,6 @@ export function ChatLayout() {
       </div>
 
       <KeyboardShortcutsDialog open={showShortcuts} onOpenChange={setShowShortcuts} />
-    </>
+    </CopilotState>
   );
 }
