@@ -2,8 +2,9 @@
 
 import "highlight.js/styles/github-dark.css";
 import hljs from "highlight.js";
-import { Check, Copy, Download, X } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { Check, Copy, Download, Maximize2, Minus, Plus, X } from "lucide-react";
+import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -12,6 +13,115 @@ import type { Artifact } from "@/hooks/use-artifacts";
 import { cn } from "@/lib/utils";
 
 import { MermaidBlock } from "./mermaid-block";
+
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 4;
+const ZOOM_STEP = 0.15;
+
+function PanZoomContainer({ children }: { children: React.ReactNode }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const [translate, setTranslate] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const lastPointer = useRef({ x: 0, y: 0 });
+
+  const handleWheel = useCallback((e: ReactWheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+    setScale((prev) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prev + delta)));
+  }, []);
+
+  const handlePointerDown = useCallback((e: ReactPointerEvent) => {
+    if (e.button !== 0) return;
+    setIsPanning(true);
+    lastPointer.current = { x: e.clientX, y: e.clientY };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }, []);
+
+  const handlePointerMove = useCallback(
+    (e: ReactPointerEvent) => {
+      if (!isPanning) return;
+      const dx = e.clientX - lastPointer.current.x;
+      const dy = e.clientY - lastPointer.current.y;
+      lastPointer.current = { x: e.clientX, y: e.clientY };
+      setTranslate((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
+    },
+    [isPanning],
+  );
+
+  const handlePointerUp = useCallback(() => {
+    setIsPanning(false);
+  }, []);
+
+  const handleZoomIn = useCallback(() => {
+    setScale((prev) => Math.min(MAX_ZOOM, prev + ZOOM_STEP));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setScale((prev) => Math.max(MIN_ZOOM, prev - ZOOM_STEP));
+  }, []);
+
+  const handleReset = useCallback(() => {
+    setScale(1);
+    setTranslate({ x: 0, y: 0 });
+  }, []);
+
+  return (
+    <div className="relative flex flex-1 flex-col">
+      <div className="absolute top-2 right-2 z-10 flex items-center gap-1 rounded-md border border-border/50 bg-background/90 p-1 shadow-sm backdrop-blur-sm">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-7"
+          onClick={handleZoomOut}
+          aria-label="Zoom out"
+        >
+          <Minus className="size-3.5" />
+        </Button>
+        <span className="min-w-[3rem] text-center font-mono text-xs text-muted-foreground">
+          {Math.round(scale * 100)}%
+        </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-7"
+          onClick={handleZoomIn}
+          aria-label="Zoom in"
+        >
+          <Plus className="size-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-7"
+          onClick={handleReset}
+          aria-label="Reset zoom"
+        >
+          <Maximize2 className="size-3.5" />
+        </Button>
+      </div>
+      <div
+        ref={containerRef}
+        className={cn("flex-1 overflow-hidden", isPanning ? "cursor-grabbing" : "cursor-grab")}
+        onWheel={handleWheel}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+      >
+        <div
+          className="flex h-full w-full items-center justify-center p-4"
+          style={{
+            transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
+            transformOrigin: "center center",
+          }}
+        >
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface ArtifactsPanelProps {
   artifacts: Artifact[];
@@ -89,12 +199,12 @@ function ArtifactViewer({ artifact }: { artifact: Artifact }) {
           </Button>
         </div>
       </div>
-      <ScrollArea className="flex-1">
-        {artifact.language === "mermaid" ? (
-          <div className="p-4">
-            <MermaidBlock chart={artifact.content} />
-          </div>
-        ) : (
+      {artifact.language === "mermaid" ? (
+        <PanZoomContainer>
+          <MermaidBlock chart={artifact.content} />
+        </PanZoomContainer>
+      ) : (
+        <ScrollArea className="flex-1">
           <pre className="p-4">
             <code
               className={cn("text-sm", artifact.language && `language-${artifact.language}`)}
@@ -102,8 +212,8 @@ function ArtifactViewer({ artifact }: { artifact: Artifact }) {
               dangerouslySetInnerHTML={{ __html: highlightedCode }}
             />
           </pre>
-        )}
-      </ScrollArea>
+        </ScrollArea>
+      )}
     </div>
   );
 }
