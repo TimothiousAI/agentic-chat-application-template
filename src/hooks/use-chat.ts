@@ -89,6 +89,18 @@ export function useChat() {
   const [streamingContent, setStreamingContent] = useState("");
   const abortControllerRef = useRef<AbortController | null>(null);
   const skipNextFetchRef = useRef(false);
+  const lastUserMessageRef = useRef<string | null>(null);
+
+  const [conversationPersonas, setConversationPersonas] = useState<Record<string, string>>({});
+  const [activePersonaSlug, setActivePersonaSlug] = useState("general-assistant");
+
+  useEffect(() => {
+    if (activeConversationId && conversationPersonas[activeConversationId]) {
+      setActivePersonaSlug(conversationPersonas[activeConversationId]);
+    } else {
+      setActivePersonaSlug("general-assistant");
+    }
+  }, [activeConversationId, conversationPersonas]);
 
   useEffect(() => {
     if (!activeConversationId) {
@@ -120,11 +132,12 @@ export function useChat() {
   }, [activeConversationId]);
 
   const sendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, attachments?: Array<{ type: "image"; dataUrl: string }>) => {
       if (isStreaming || !content.trim()) {
         return;
       }
 
+      lastUserMessageRef.current = content;
       setIsStreaming(true);
       setStreamingContent("");
 
@@ -141,6 +154,8 @@ export function useChat() {
           body: JSON.stringify({
             content,
             conversationId: activeConversationId ?? undefined,
+            personaSlug: activePersonaSlug,
+            attachments,
           }),
           signal: abortController.signal,
         });
@@ -159,6 +174,10 @@ export function useChat() {
           setMessages((prev) =>
             prev.map((m) => (m.id === tempUserMessage.id ? { ...m, conversationId } : m)),
           );
+          setConversationPersonas((prev) => ({
+            ...prev,
+            [conversationId]: activePersonaSlug,
+          }));
         } else if (activeConversationId) {
           updateItem(activeConversationId, { updatedAt: new Date().toISOString() });
         }
@@ -190,8 +209,14 @@ export function useChat() {
         setStreamingContent("");
       }
     },
-    [activeConversationId, isStreaming, addItem, updateItem],
+    [activeConversationId, isStreaming, addItem, updateItem, activePersonaSlug],
   );
+
+  const stopStreaming = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+  }, []);
 
   const selectConversation = useCallback((id: string) => {
     abortControllerRef.current?.abort();
@@ -240,6 +265,32 @@ export function useChat() {
     [activeConversationId, removeItem],
   );
 
+  const regenerateLastMessage = useCallback(() => {
+    if (lastUserMessageRef.current) {
+      setMessages((prev) => {
+        const lastMessage = prev[prev.length - 1];
+        if (lastMessage?.role === "assistant") {
+          return prev.slice(0, -1);
+        }
+        return prev;
+      });
+      void sendMessage(lastUserMessageRef.current);
+    }
+  }, [sendMessage]);
+
+  const handleSetActivePersonaSlug = useCallback(
+    (slug: string) => {
+      setActivePersonaSlug(slug);
+      if (activeConversationId) {
+        setConversationPersonas((prev) => ({
+          ...prev,
+          [activeConversationId]: slug,
+        }));
+      }
+    },
+    [activeConversationId],
+  );
+
   return {
     conversations,
     activeConversationId,
@@ -252,5 +303,9 @@ export function useChat() {
     createNewChat,
     renameConversation,
     deleteConversation,
+    stopStreaming,
+    regenerateLastMessage,
+    activePersonaSlug,
+    setActivePersonaSlug: handleSetActivePersonaSlug,
   };
 }

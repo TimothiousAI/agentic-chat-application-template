@@ -1,7 +1,8 @@
 "use client";
 
 import { Bot } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { useEffect, useRef, useState } from "react";
 
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
 
@@ -17,14 +18,70 @@ interface MessageListProps {
   messages: Message[];
   streamingContent: string;
   isStreaming: boolean;
+  onRegenerate?: () => void;
+  onOpenArtifact?:
+    | ((artifact: {
+        type: "code" | "text";
+        language?: string | undefined;
+        content: string;
+      }) => void)
+    | undefined;
 }
 
-export function MessageList({ messages, streamingContent, isStreaming }: MessageListProps) {
+function StreamingText({ content }: { content: string }) {
+  const words = content.split(/(\s+)/);
+
+  return (
+    <p className="text-sm whitespace-pre-wrap">
+      {words.map((word, idx) => (
+        <span
+          // biome-ignore lint/suspicious/noArrayIndexKey: words are positional tokens during streaming
+          key={idx}
+          className="streaming-word"
+          style={{
+            animationDelay: `${idx * 0.02}s`,
+          }}
+        >
+          {word}
+        </span>
+      ))}
+      <span className="streaming-cursor ml-0.5 inline-block h-4 w-1.5 align-middle" />
+    </p>
+  );
+}
+
+export function MessageList({
+  messages,
+  streamingContent,
+  isStreaming,
+  onRegenerate,
+  onOpenArtifact,
+}: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { scrollToBottom, isScrolledToBottom } = useAutoScroll(containerRef);
   const prevMessageCountRef = useRef(messages.length);
+  const [loadedMessageIds, setLoadedMessageIds] = useState<Set<string>>(new Set());
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  // Auto-scroll when new messages are added (e.g., user sends a message)
+  // On first messages load, mark all as "loaded" (no animation)
+  useEffect(() => {
+    if (isInitialLoad && messages.length > 0) {
+      setLoadedMessageIds(new Set(messages.map((m) => m.id)));
+      setIsInitialLoad(false);
+    }
+  }, [messages.length, isInitialLoad, messages]);
+
+  // Detect newly added messages
+  useEffect(() => {
+    if (!isInitialLoad) {
+      const newIds = messages.filter((m) => !loadedMessageIds.has(m.id)).map((m) => m.id);
+      if (newIds.length > 0) {
+        setLoadedMessageIds((prev) => new Set([...prev, ...newIds]));
+      }
+    }
+  }, [messages, loadedMessageIds, isInitialLoad]);
+
+  // Auto-scroll when new messages are added
   useEffect(() => {
     if (messages.length > prevMessageCountRef.current) {
       scrollToBottom();
@@ -45,35 +102,66 @@ export function MessageList({ messages, streamingContent, isStreaming }: Message
   return (
     <div ref={containerRef} className="flex-1 overflow-y-auto">
       <div className="mx-auto max-w-3xl py-4">
-        {messages.map((message) => (
-          <MessageBubble key={message.id} role={message.role} content={message.content} />
-        ))}
+        <AnimatePresence initial={false}>
+          {messages.map((message, index) => {
+            const isLastAssistant = message.role === "assistant" && index === messages.length - 1;
+            const isNewMessage = !loadedMessageIds.has(message.id);
+            const isUser = message.role === "user";
+
+            return (
+              <motion.div
+                key={message.id}
+                initial={isNewMessage ? { opacity: 0, x: isUser ? 20 : -20 } : false}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
+              >
+                <MessageBubble
+                  role={message.role}
+                  content={message.content}
+                  onRegenerate={isLastAssistant ? onRegenerate : undefined}
+                  onOpenArtifact={onOpenArtifact}
+                />
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
         {isStreaming && streamingContent && (
-          <div className="flex gap-3 px-4 py-3">
-            <div className="bg-muted flex size-8 shrink-0 items-center justify-center rounded-full">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="flex gap-3 px-4 py-3"
+          >
+            <div className="bg-muted ring-primary/20 flex size-8 shrink-0 items-center justify-center rounded-full ring-1">
               <Bot className="text-muted-foreground size-4" />
             </div>
             <div className="bg-muted text-foreground max-w-[80%] rounded-2xl px-4 py-2.5">
-              <p className="text-sm whitespace-pre-wrap">
-                {streamingContent}
-                <span className="streaming-cursor ml-0.5 inline-block h-4 w-1.5 align-middle" />
-              </p>
+              <StreamingText content={streamingContent} />
             </div>
-          </div>
+          </motion.div>
         )}
         {isStreaming && !streamingContent && (
-          <div className="flex gap-3 px-4 py-3">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="flex gap-3 px-4 py-3"
+          >
             <div className="bg-muted flex size-8 shrink-0 items-center justify-center rounded-full">
               <Bot className="text-muted-foreground size-4" />
             </div>
-            <div className="bg-muted max-w-[80%] rounded-2xl px-4 py-2.5">
-              <div className="flex items-center gap-1">
-                <span className="bg-primary/60 size-1.5 animate-bounce rounded-full [animation-delay:0ms]" />
-                <span className="bg-primary/60 size-1.5 animate-bounce rounded-full [animation-delay:150ms]" />
-                <span className="bg-primary/60 size-1.5 animate-bounce rounded-full [animation-delay:300ms]" />
+            <div className="bg-muted rounded-2xl px-4 py-3">
+              <div className="thinking-orb-container">
+                <div className="thinking-orb">
+                  <div className="thinking-orb-ring-outer" />
+                  <div className="thinking-orb-ring" />
+                  <div className="thinking-orb-core" />
+                </div>
+                <span className="thinking-text">Thinking...</span>
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
       </div>
     </div>

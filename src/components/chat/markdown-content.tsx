@@ -2,7 +2,7 @@
 
 import "highlight.js/styles/github-dark.css";
 import { Check, Copy } from "lucide-react";
-import type { HTMLAttributes } from "react";
+import type { HTMLAttributes, ReactElement, ReactNode } from "react";
 import { useCallback, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
@@ -10,9 +10,28 @@ import remarkGfm from "remark-gfm";
 
 import { cn } from "@/lib/utils";
 
+import { MermaidBlock } from "./mermaid-block";
+
+function extractText(node: ReactNode): string {
+  if (typeof node === "string") {
+    return node;
+  }
+  if (Array.isArray(node)) {
+    return node.map(extractText).join("");
+  }
+  if (node && typeof node === "object" && "props" in node) {
+    const element = node as ReactElement<{ children?: ReactNode }>;
+    return extractText(element.props.children);
+  }
+  return "";
+}
+
 function CodeBlock({ children, className, ...props }: HTMLAttributes<HTMLPreElement>) {
   const [copied, setCopied] = useState(false);
   const preRef = useRef<HTMLPreElement>(null);
+
+  const match = /language-(\w+)/.exec(className ?? "");
+  const language = match?.[1];
 
   const handleCopy = useCallback(async () => {
     try {
@@ -24,6 +43,11 @@ function CodeBlock({ children, className, ...props }: HTMLAttributes<HTMLPreElem
       // Clipboard API unavailable (e.g. non-HTTPS or restricted context)
     }
   }, []);
+
+  if (language === "mermaid") {
+    const code = extractText(children).replace(/\n$/, "");
+    return <MermaidBlock chart={code} />;
+  }
 
   return (
     <div className="group/code relative">

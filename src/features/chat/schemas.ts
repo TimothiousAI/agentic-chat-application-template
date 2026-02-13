@@ -1,11 +1,18 @@
 import { z } from "zod/v4";
 
+const AttachmentSchema = z.object({
+  type: z.literal("image"),
+  dataUrl: z.string(),
+});
+
 export const SendMessageSchema = z.object({
   content: z
     .string()
     .min(1, "Content must be at least 1 character")
     .max(10000, "Content must be at most 10000 characters"),
   conversationId: z.string().uuid().optional(),
+  personaSlug: z.string().optional(),
+  attachments: z.array(AttachmentSchema).optional(),
 });
 
 export type SendMessageInput = z.infer<typeof SendMessageSchema>;

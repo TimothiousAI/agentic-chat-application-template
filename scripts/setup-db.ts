@@ -85,11 +85,74 @@ async function setup() {
   `);
   console.log(`  ${p("chat_messages")}`);
 
+  // 5. Chat shared conversations table
+  await sql.unsafe(`
+    CREATE TABLE IF NOT EXISTS "${p("chat_shared_conversations")}" (
+      "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      "conversation_id" uuid NOT NULL REFERENCES "${p("chat_conversations")}"("id") ON DELETE CASCADE,
+      "share_token" text NOT NULL UNIQUE,
+      "expires_at" timestamp,
+      "created_at" timestamp DEFAULT now() NOT NULL,
+      "updated_at" timestamp DEFAULT now() NOT NULL
+    )
+  `);
+  console.log(`  ${p("chat_shared_conversations")}`);
+
+  // 6. Chat documents table
+  await sql.unsafe(`
+    CREATE TABLE IF NOT EXISTS "${p("chat_documents")}" (
+      "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      "title" text NOT NULL,
+      "filename" text NOT NULL,
+      "mime_type" text NOT NULL,
+      "size" integer NOT NULL,
+      "content" text NOT NULL,
+      "created_at" timestamp DEFAULT now() NOT NULL,
+      "updated_at" timestamp DEFAULT now() NOT NULL
+    )
+  `);
+  console.log(`  ${p("chat_documents")}`);
+
+  // 7. Chat document chunks table (requires pgvector extension)
+  await sql.unsafe("CREATE EXTENSION IF NOT EXISTS vector");
+  await sql.unsafe(`
+    CREATE TABLE IF NOT EXISTS "${p("chat_document_chunks")}" (
+      "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      "document_id" uuid NOT NULL REFERENCES "${p("chat_documents")}"("id") ON DELETE CASCADE,
+      "chunk_index" integer NOT NULL,
+      "content" text NOT NULL,
+      "embedding" vector(384),
+      "token_count" integer NOT NULL,
+      "created_at" timestamp DEFAULT now() NOT NULL,
+      "updated_at" timestamp DEFAULT now() NOT NULL
+    )
+  `);
+  // Create HNSW index for similarity search
+  await sql.unsafe(`
+    CREATE INDEX IF NOT EXISTS "${p("chat_document_chunks")}_embedding_idx"
+    ON "${p("chat_document_chunks")}" USING hnsw ("embedding" vector_cosine_ops)
+  `);
+  console.log(`  ${p("chat_document_chunks")}`);
+
+  // 8. Chat memories table
+  await sql.unsafe(`
+    CREATE TABLE IF NOT EXISTS "${p("chat_memories")}" (
+      "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      "key" text NOT NULL,
+      "value" text NOT NULL,
+      "category" text,
+      "conversation_id" uuid REFERENCES "${p("chat_conversations")}"("id") ON DELETE CASCADE,
+      "created_at" timestamp DEFAULT now() NOT NULL,
+      "updated_at" timestamp DEFAULT now() NOT NULL
+    )
+  `);
+  console.log(`  ${p("chat_memories")}`);
+
   console.log("\nDone! All tables created.");
 
   if (prefix) {
     console.log(
-      `\nYour tables: ${p("projects")}, ${p("chat_conversations")}, ${p("chat_messages")}`,
+      `\nYour tables: ${p("projects")}, ${p("chat_conversations")}, ${p("chat_messages")}, ${p("chat_shared_conversations")}, ${p("chat_documents")}, ${p("chat_document_chunks")}, ${p("chat_memories")}`,
     );
     console.log("Shared table: users");
   }

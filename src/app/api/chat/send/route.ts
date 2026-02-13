@@ -10,6 +10,7 @@ import {
   SendMessageSchema,
   streamChatCompletion,
 } from "@/features/chat";
+import { getDefaultPersona, getPersonaBySlug } from "@/features/personas";
 
 const logger = getLogger("api.chat.send");
 
@@ -20,7 +21,16 @@ const logger = getLogger("api.chat.send");
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { content, conversationId: existingConversationId } = SendMessageSchema.parse(body);
+    const {
+      content,
+      conversationId: existingConversationId,
+      personaSlug,
+      attachments,
+    } = SendMessageSchema.parse(body);
+
+    // Resolve persona
+    const persona = personaSlug ? getPersonaBySlug(personaSlug) : getDefaultPersona();
+    const systemPrompt = persona?.systemPrompt;
 
     // Create conversation if needed
     let conversationId = existingConversationId;
@@ -37,8 +47,17 @@ export async function POST(request: NextRequest) {
     // Get history for context
     const history = await getMessages(conversationId);
 
+    // RAG context (optional)
+    const ragContext = undefined;
+
     // Stream completion
-    const { stream, fullResponse } = await streamChatCompletion(history);
+    const { stream, fullResponse } = await streamChatCompletion(
+      history,
+      undefined,
+      systemPrompt,
+      attachments,
+      ragContext,
+    );
 
     // Wrap the stream to save assistant message after completion
     const reader = stream.getReader();

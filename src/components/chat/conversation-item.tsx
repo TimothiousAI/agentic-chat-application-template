@@ -90,7 +90,7 @@ export function ConversationItem({
   return (
     <div
       className={cn(
-        "group flex items-center gap-1 rounded-md px-2 py-1.5 text-sm cursor-pointer border-l-2",
+        "conversation-item-enter group flex items-center gap-1 rounded-md px-2 py-1.5 text-sm cursor-pointer border-l-2",
         isActive
           ? "border-primary bg-primary/15 text-primary"
           : "border-transparent hover:bg-accent/50 text-foreground",

@@ -42,7 +42,7 @@ function SidebarContent({
       <div className="p-3">
         <Button
           variant="outline"
-          className="w-full justify-start gap-2 border-primary/30 hover:bg-primary/10 hover:text-primary"
+          className="new-chat-pulse w-full justify-start gap-2 border-primary/30 hover:bg-primary/10 hover:text-primary"
           onClick={onNewChat}
         >
           <Plus className="size-4" />

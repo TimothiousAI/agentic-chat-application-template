@@ -355,3 +355,5 @@ Now read the plan at `$ARGUMENTS[0]` and begin:
 9. When all agents return, run end-to-end validation yourself (start services, use agent-browser for UI testing)
 10. If validation fails, re-spawn the relevant agent with the specific issue
 11. Confirm the build meets the plan's requirements
+
+If you need any clarification on Anthropics Agent Teams research this link and create an AI Docs reference document in the .claude folder (make dir if necessary) and then update the CLAUDE.md and the build-with-agent-team skill to ensure claude code understands how to best use agent teams. https://code.claude.com/docs/en/agent-teams

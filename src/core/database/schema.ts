@@ -1,4 +1,13 @@
-import { boolean, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+  vector,
+} from "drizzle-orm/pg-core";
 
 /**
  * Table name prefix for multi-tenant workshop environments.
@@ -83,5 +92,70 @@ export const chatMessages = pgTable(t("chat_messages"), {
     .references(() => chatConversations.id, { onDelete: "cascade" }),
   role: text("role").notNull(),
   content: text("content").notNull(),
+  ...timestamps,
+});
+
+/**
+ * Shared conversations table - enables sharing conversations via unique tokens.
+ */
+export const chatSharedConversations = pgTable(t("chat_shared_conversations"), {
+  id: uuid("id").primaryKey().defaultRandom(),
+  conversationId: uuid("conversation_id")
+    .notNull()
+    .references(() => chatConversations.id, { onDelete: "cascade" }),
+  shareToken: text("share_token").notNull().unique(),
+  expiresAt: timestamp("expires_at"),
+  ...timestamps,
+});
+
+/**
+ * Documents table - stores uploaded document metadata and content.
+ */
+export const chatDocuments = pgTable(t("chat_documents"), {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: text("title").notNull(),
+  filename: text("filename").notNull(),
+  mimeType: text("mime_type").notNull(),
+  size: integer("size").notNull(),
+  content: text("content").notNull(),
+  ...timestamps,
+});
+
+/**
+ * Document chunks table - stores chunked document content with vector embeddings.
+ * Requires the pgvector extension to be enabled in the database.
+ */
+export const chatDocumentChunks = pgTable(
+  t("chat_document_chunks"),
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => chatDocuments.id, { onDelete: "cascade" }),
+    chunkIndex: integer("chunk_index").notNull(),
+    content: text("content").notNull(),
+    embedding: vector("embedding", { dimensions: 384 }),
+    tokenCount: integer("token_count").notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index("chat_document_chunks_embedding_idx").using(
+      "hnsw",
+      table.embedding.op("vector_cosine_ops"),
+    ),
+  ],
+);
+
+/**
+ * Memories table - stores key-value memories optionally linked to conversations.
+ */
+export const chatMemories = pgTable(t("chat_memories"), {
+  id: uuid("id").primaryKey().defaultRandom(),
+  key: text("key").notNull(),
+  value: text("value").notNull(),
+  category: text("category"),
+  conversationId: uuid("conversation_id").references(() => chatConversations.id, {
+    onDelete: "cascade",
+  }),
   ...timestamps,
 });

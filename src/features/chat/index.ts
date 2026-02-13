@@ -1,7 +1,6 @@
-// Types
-
 // Constants
 export { MAX_CONTEXT_MESSAGES, SYSTEM_PROMPT } from "./constants";
+
 // Errors
 export type { ChatErrorCode } from "./errors";
 export {
@@ -10,12 +9,15 @@ export {
   OpenRouterError,
   StreamError,
 } from "./errors";
+
+// Types
 export type { Conversation, Message, NewConversation, NewMessage } from "./models";
 export type {
   CreateConversationInput,
   SendMessageInput,
   UpdateConversationInput,
 } from "./schemas";
+
 // Schemas (for validation)
 export { CreateConversationSchema, SendMessageSchema, UpdateConversationSchema } from "./schemas";
 
@@ -31,4 +33,5 @@ export {
 } from "./service";
 
 // Stream functions
+export type { MessageAttachment } from "./stream";
 export { buildMessages, streamChatCompletion } from "./stream";

@@ -7,12 +7,55 @@ import type { Message } from "./models";
 
 const logger = getLogger("chat.stream");
 
-export function buildMessages(history: Message[]): Array<{ role: string; content: string }> {
+export interface MessageAttachment {
+  type: "image";
+  dataUrl: string;
+}
+
+type MessageContent = string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
+
+export function buildMessages(
+  history: Message[],
+  systemPrompt?: string,
+  attachments?: MessageAttachment[],
+  ragContext?: string,
+): Array<{ role: string; content: MessageContent }> {
   const limitedHistory = history.slice(-MAX_CONTEXT_MESSAGES);
-  return [
-    { role: "system", content: SYSTEM_PROMPT },
-    ...limitedHistory.map((m) => ({ role: m.role, content: m.content })),
+  const basePrompt = systemPrompt ?? SYSTEM_PROMPT;
+  const prompt = ragContext
+    ? `${basePrompt}\n\nRelevant context from knowledge base:\n${ragContext}`
+    : basePrompt;
+
+  const messages: Array<{ role: string; content: MessageContent }> = [
+    { role: "system", content: prompt },
   ];
+
+  for (const m of limitedHistory) {
+    messages.push({ role: m.role, content: m.content });
+  }
+
+  if (attachments && attachments.length > 0) {
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage) {
+      const textContent = typeof lastMessage.content === "string" ? lastMessage.content : "";
+      const multimodalContent: Array<{
+        type: string;
+        text?: string;
+        image_url?: { url: string };
+      }> = [{ type: "text", text: textContent }];
+
+      for (const attachment of attachments) {
+        multimodalContent.push({
+          type: "image_url",
+          image_url: { url: attachment.dataUrl },
+        });
+      }
+
+      messages[messages.length - 1] = { role: lastMessage.role, content: multimodalContent };
+    }
+  }
+
+  return messages;
 }
 
 interface ParsedSSELine {
@@ -50,6 +93,9 @@ function parseSSELine(line: string): ParsedSSELine {
 export async function streamChatCompletion(
   history: Message[],
   signal?: AbortSignal,
+  systemPrompt?: string,
+  attachments?: MessageAttachment[],
+  ragContext?: string,
 ): Promise<{ stream: ReadableStream; fullResponse: Promise<string> }> {
   logger.info({ messageCount: history.length }, "stream.chat_started");
 
@@ -63,7 +109,7 @@ export async function streamChatCompletion(
       },
       body: JSON.stringify({
         model: env.OPENROUTER_MODEL,
-        messages: buildMessages(history),
+        messages: buildMessages(history, systemPrompt, attachments, ragContext),
         stream: true,
       }),
       signal: signal ?? null,
